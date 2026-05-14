@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Herramienta PERT AOA</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #f0f4f8;
+      color: #1a2a3a;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #1a3a5c 0%, #2563a8 100%);
+      color: white;
+      padding: 20px 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: .3px; }
+    header span { font-size: 2rem; }
+
+    /* ── Layout ── */
+    main {
+      max-width: 1100px;
+      margin: 28px auto;
+      padding: 0 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      padding: 24px 28px;
+    }
+    .card h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #1a3a5c;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── Nombre del proyecto ── */
+    .field-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .field-row label { font-weight: 600; white-space: nowrap; }
+    .field-row input {
+      flex: 1;
+      min-width: 220px;
+      padding: 9px 14px;
+      border: 1.5px solid #c8d6e8;
+      border-radius: 8px;
+      font-size: .95rem;
+      transition: border-color .2s;
+    }
+    .field-row input:focus { outline: none; border-color: #2563a8; }
+
+    /* ── Tabla de tareas ── */
+    .table-wrapper { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .92rem;
+    }
+    thead th {
+      background: #1a3a5c;
+      color: white;
+      padding: 10px 12px;
+      text-align: center;
+      font-weight: 600;
+      letter-spacing: .2px;
+    }
+    tbody tr:nth-child(even) { background: #f4f8ff; }
+    tbody tr:hover           { background: #e8f0fb; }
+    tbody td {
+      padding: 7px 8px;
+      border-bottom: 1px solid #e0e8f0;
+    }
+    tbody td input {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1.5px solid transparent;
+      border-radius: 6px;
+      font-size: .92rem;
+      background: transparent;
+      transition: border-color .15s, background .15s;
+    }
+    tbody td input:focus {
+      outline: none;
+      border-color: #2563a8;
+      background: white;
+    }
+    td.del-col { width: 44px; text-align: center; }
+    .btn-del {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #cc3333;
+      font-size: 1.1rem;
+      padding: 4px 6px;
+      border-radius: 6px;
+      transition: background .15s;
+    }
+    .btn-del:hover { background: #ffe5e5; }
+
+    /* ── Botones de acción ── */
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .btn {
+      padding: 9px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: .93rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter .15s, transform .1s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:hover  { filter: brightness(1.08); }
+    .btn-primary   { background: #2563a8; color: white; }
+    .btn-secondary { background: #e2ecf8; color: #1a3a5c; }
+    .btn-success   { background: #1a7a4a; color: white; }
+    .btn-warning   { background: #e07b00; color: white; }
+    .btn-zip       { background: #5a2d8c; color: white; }
+    .btn-clear     { background: #f0f4f8; color: #666; border: 1.5px solid #ccc; }
+
+    /* ── Spinner ── */
+    #spinner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      color: #2563a8;
+      font-weight: 600;
+      padding: 8px 0;
+    }
+    .spin {
+      width: 22px; height: 22px;
+      border: 3px solid #c8d6e8;
+      border-top-color: #2563a8;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Error ── */
+    #error-box {
+      display: none;
+      background: #fff0f0;
+      border: 1.5px solid #e08080;
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: #8b0000;
+      font-weight: 500;
+    }
+
+    /* ── Resultados ── */
+    #results { display: none; }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .result-badges {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: .9rem;
+      font-weight: 600;
+    }
+    .badge-blue { background: #dbeafe; color: #1a3a5c; }
+    .badge-red  { background: #ffe0e0; color: #8b0000; }
+
+    /* ── Diagrama ── */
+    #diagram-container {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    #diagram-container img {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid #dde6f0;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+
+    /* ── Tabla resumen ── */
+    .summary-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    .summary-table thead th {
+      background: #1a3a5c;
+      color: white;
+      padding: 9px 12px;
+      text-align: center;
+    }
+    .summary-table tbody td {
+      padding: 7px 10px;
+      border-bottom: 1px solid #e0e8f0;
+      text-align: center;
+    }
+    .summary-table tbody tr.critical-row {
+      background: #fff0f0;
+      font-weight: 600;
+      color: #8b0000;
+    }
+    .summary-table tbody tr:not(.critical-row):nth-child(even) { background: #f4f8ff; }
+    .crit-badge {
+      background: #cc0000;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: .8rem;
+    }
+
+    /* ── Download buttons ── */
+    .download-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      color: #8899aa;
+      font-size: .85rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span>📊</span>
+  <h1>Herramienta PERT — AOA</h1>
+</header>
+
+<main>
+
+  <!-- Card: configuración -->
+  <div class="card">
+    <h2>⚙️ Configuración del proyecto</h2>
+    <div class="field-row">
+      <label for="project-name">Nombre del proyecto:</label>
+      <input type="text" id="project-name" placeholder="Ej: Sistema de cobranza" value="Proyecto PERT">
+    </div>
+  </div>
+
+  <!-- Card: tabla de tareas -->
+  <div class="card">
+    <h2>📋 Actividades</h2>
+    <p style="font-size:.88rem;color:#556;margin-bottom:12px;">
+      Completá la tabla con las actividades del proyecto.
+      En <strong>Predecesores</strong> ingresá los IDs separados por espacios (ej: <code>A B</code>).
+      Dejalo vacío si la actividad no tiene predecesores.
+    </p>
+    <div class="table-wrapper">
+      <table id="tasks-table">
+        <thead>
+          <tr>
+            <th style="width:140px">ID / Nombre</th>
+            <th style="width:100px">Duración</th>
+            <th>Predecesores</th>
+            <th style="width:44px"></th>
+          </tr>
+        </thead>
+        <tbody id="tasks-body">
+          <!-- filas dinámicas -->
+        </tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="addRow()">➕ Agregar fila</button>
+      <button class="btn btn-clear" onclick="clearTable()">🗑️ Limpiar tabla</button>
+      <button class="btn btn-secondary" onclick="loadExample()">📂 Cargar ejemplo</button>
+    </div>
+  </div>
+
+  <!-- Card: ejecutar -->
+  <div class="card">
+    <h2>🚀 Generar diagrama</h2>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="runPert()">▶ Calcular y generar</button>
+    </div>
+    <div id="spinner" style="margin-top:14px;">
+      <div class="spin"></div>
+      <span>Calculando y generando diagrama…</span>
+    </div>
+    <div id="error-box" style="margin-top:14px;"></div>
+  </div>
+
+  <!-- Card: resultados -->
+  <div class="card" id="results">
+    <h2>✅ Resultados</h2>
+
+    <div class="result-header">
+      <div class="result-badges">
+        <span class="badge badge-blue">⏱ Duración total: <strong id="res-duration">—</strong> días</span>
+        <span class="badge badge-red">🔴 Ruta crítica: <strong id="res-critical">—</strong></span>
+      </div>
+      <div class="download-row">
+        <button class="btn btn-success"  id="btn-dl-png"  onclick="download('png')">⬇ Descargar PNG</button>
+        <button class="btn btn-warning"  id="btn-dl-xlsx" onclick="download('xlsx')">⬇ Descargar Excel</button>
+        <button class="btn btn-zip"      id="btn-dl-zip"  onclick="download('zip')">📦 Descargar ZIP</button>
+      </div>
+    </div>
+
+    <div id="diagram-container">
+      <img id="diagram-img" src="" alt="Diagrama PERT">
+    </div>
+
+    <h2 style="margin-bottom:12px;">📊 Tabla resumen de actividades</h2>
+    <div class="table-wrapper">
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Actividad</th>
+            <th>Duración</th>
+            <th>ES</th><th>EF</th>
+            <th>LS</th><th>LF</th>
+            <th>Holgura</th>
+            <th>¿Crítica?</th>
+          </tr>
+        </thead>
+        <tbody id="summary-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>Herramienta PERT AOA · Tecnicatura en Redes y Software</footer>
+
+<script>
+  let currentSafeName = null;
+
+  // ── Inicializar tabla con filas vacías ──────────────────────────────
+  function init() {
+    for (let i = 0; i < 5; i++) addRow();
+  }
+
+  function addRow(name="", duration="", predecessors="") {
+    const tbody = document.getElementById("tasks-body");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input type="text"   class="t-name" placeholder="Ej: A"  value="${name}"></td>
+      <td><input type="number" class="t-dur"  placeholder="0" min="0" value="${duration}"></td>
+      <td><input type="text"   class="t-pred" placeholder="Ej: A B" value="${predecessors}"></td>
+      <td class="del-col"><button class="btn-del" title="Eliminar fila" onclick="delRow(this)">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  function delRow(btn) {
+    btn.closest("tr").remove();
+  }
+
+  function clearTable() {
+    document.getElementById("tasks-body").innerHTML = "";
+    for (let i = 0; i < 5; i++) addRow();
+    hideResults();
+  }
+
+  function loadExample() {
+    document.getElementById("tasks-body").innerHTML = "";
+    document.getElementById("project-name").value = "Proyecto Ejemplo";
+    const example = [
+      ["A", 4, ""],
+      ["B", 2, "A"],
+      ["C", 3, "B"],
+      ["D", 2, "A"],
+      ["E", 3, ""],
+      ["F", 2, "D C"],
+      ["G", 4, "E"],
+    ];
+    example.forEach(([n, d, p]) => addRow(n, d, p));
+    hideResults();
+  }
+
+  // ── Recolectar datos de la tabla ───────────────────────────────────
+  function getTasksData() {
+    const rows = document.querySelectorAll("#tasks-body tr");
+    const tasks = [];
+    rows.forEach(tr => {
+      const name         = tr.querySelector(".t-name").value.trim();
+      const duration     = parseInt(tr.querySelector(".t-dur").value) || 0;
+      const predecessors = tr.querySelector(".t-pred").value.trim();
+      if (name) tasks.push({ name, duration, predecessors });
+    });
+    return tasks;
+  }
+
+  // ── Llamar al backend ──────────────────────────────────────────────
+  async function runPert() {
+    const projectName = document.getElementById("project-name").value.trim() || "Proyecto PERT";
+    const tasks       = getTasksData();
+
+    setError("");
+    hideResults();
+    setSpinner(true);
+
+    try {
+      const resp = await fetch("/api/run", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ project_name: projectName, tasks }),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok || data.error) {
+        setError(data.error || "Error desconocido.");
+        return;
+      }
+
+      currentSafeName = data.safe_name;
+      showResults(data);
+    } catch (e) {
+      setError("No se pudo conectar con el servidor: " + e.message);
+    } finally {
+      setSpinner(false);
+    }
+  }
+
+  // ── Mostrar resultados ─────────────────────────────────────────────
+  function showResults(data) {
+    document.getElementById("res-duration").textContent = data.duration;
+    document.getElementById("res-critical").textContent = data.critical_path || "(no detectada)";
+    document.getElementById("diagram-img").src = "data:image/png;base64," + data.image_b64;
+
+    const tbody = document.getElementById("summary-body");
+    tbody.innerHTML = "";
+    data.table.forEach(row => {
+      const tr = document.createElement("tr");
+      if (row.critical) tr.classList.add("critical-row");
+      tr.innerHTML = `
+        <td>${row.name}</td>
+        <td>${row.duration}</td>
+        <td>${row.es}</td><td>${row.ef}</td>
+        <td>${row.ls}</td><td>${row.lf}</td>
+        <td>${row.slack}</td>
+        <td>${row.critical ? '<span class="crit-badge">Sí ★</span>' : 'No'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("results").style.display = "block";
+    document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function hideResults() {
+    document.getElementById("results").style.display = "none";
+    currentSafeName = null;
+  }
+
+  // ── Descargas ──────────────────────────────────────────────────────
+  function download(fmt) {
+    if (!currentSafeName) { alert("Primero generá el diagrama."); return; }
+    window.location.href = `/api/download/${currentSafeName}/${fmt}`;
+  }
+
+  // ── UI helpers ─────────────────────────────────────────────────────
+  function setSpinner(on) {
+    document.getElementById("spinner").style.display = on ? "flex" : "none";
+  }
+  function setError(msg) {
+    const box = document.getElementById("error-box");
+    if (msg) {
+      box.textContent = "⚠ " + msg;
+      box.style.display = "block";
+    } else {
+      box.style.display = "none";
+    }
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────
+  init();
+</script>
+
+</body>
+</html>
